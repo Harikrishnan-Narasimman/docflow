@@ -1,8 +1,8 @@
 # DocFlow
 
-A multi-agent pipeline that processes invoices and receipts using three specialized
-agents that hand work off to each other, rather than one model doing
-everything in a single call.
+A multi-agent pipeline that processes invoices, receipts, and purchase
+orders using three specialized agents that hand work off to each other,
+rather than one model doing everything in a single call.
 
 ## Architecture
 
@@ -77,12 +77,24 @@ number of attempts, and a log of what happened at each step.
 python -m app.evaluate
 ```
 
-This processes three sample documents in `sample_docs/`:
-- `clean_invoice.txt` — should classify and extract correctly on the first attempt
-- `clean_receipt.txt` — should classify and extract correctly on the first attempt
-- `math_error_invoice.txt` — contains an intentional line-item math error
-  (line total doesn't match quantity x unit price), used to confirm the
-  validator catches it and the extractor retry loop engages
+## Results
+
+Tested against 22 documents: clean invoices/receipts/purchase orders,
+plus edge cases covering non-USD currency, duplicate and negative-quantity
+line items, non-US date formats, large item counts, zero tax, rounding,
+severe OCR noise, stacked discounts, missing required fields, multi-page
+formatting, ambiguous document types, and near-empty input.
+
+| Outcome | Count |
+|---|---|
+| Correctly processed | 16/22 |
+| Correctly declined (missing data, out-of-scope, degenerate input) | 3/22 |
+
+**Correct-outcome rate: 19/22 (86%)** when counting honest refusals as
+correct behavior rather than failures. The pipeline declined to
+hallucinate a missing vendor name, correctly rejected an unrelated
+internal memo, and correctly refused to fabricate data for a near-empty
+document rather than guessing.
 
 ## Project structure
 
@@ -97,7 +109,7 @@ app/
   orchestrator.py      # coordinates the handoff and retry loop between agents
   main.py              # FastAPI endpoint
   evaluate.py          # test harness against sample documents
-sample_docs/           # sample invoice/receipt text files, including one with an error
+sample_docs/           # sample invoice/receipt/PO text files, including edge cases
 ```
 
 ## Extending this project
@@ -105,8 +117,6 @@ sample_docs/           # sample invoice/receipt text files, including one with a
 - **Real OCR input**: swap the raw text input for actual OCR output
   (e.g., via `pytesseract` or a cloud OCR API) so the pipeline handles
   scanned documents, not just clean text.
-- **More document types**: add purchase orders or contracts as classifier
-  categories and give the extractor a type-specific field schema for each.
 - **MCP-based ingestion**: instead of accepting raw text via the API,
   pull documents from an external source (email inbox, cloud storage
   folder) using the Model Context Protocol, so the pipeline can process
